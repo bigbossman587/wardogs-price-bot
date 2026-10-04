@@ -3,8 +3,10 @@ import re
 import sys
 import requests
 
-# 1. Grab the secure Discord Webhook from GitHub settings
+# Grab secure Discord Webhook and GitHub passes
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 if not DISCORD_WEBHOOK_URL:
     print("Error: DISCORD_WEBHOOK_URL is missing!")
@@ -14,7 +16,6 @@ if not DISCORD_WEBHOOK_URL:
 def fetch_wardogs_gold_price():
     """Fetches the live gold price from the official WARDOGS site."""
     try:
-        # We target the official Wardogs Gold Market page
         url = "https://wardogshub.gg"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -22,54 +23,77 @@ def fetch_wardogs_gold_price():
         response = requests.get(url, headers=headers, timeout=15)
 
         if response.status_code != 200:
-            return "Unknown (Site Error)"
+            return None
 
         # Search the page HTML for the dollar price pattern (e.g., $166,000)
         matches = re.findall(r"\$\d{1,3}(?:,\d{3})*", response.text)
-
         if matches:
-            # Return the first dollar value found on the market page
-            return matches[0]
+            return str(matches[0])  # Extracts the exact first clean price string found
 
-        return "Unknown (Price Not Found)"
+        return None
     except Exception as e:
         print(f"Scraping error: {e}")
-        return "Unknown (Error)"
+        return None
 
 
-def send_to_discord():
-    price = fetch_wardogs_gold_price()
+def get_last_saved_price():
+    """Reads the price we saved yesterday from our log file."""
+    if os.path.exists("last_price.txt"):
+        with open("last_price.txt", "r") as f:
+            return f.read().strip()
+    return ""
 
-    # Structure a clean Discord Embed message
+
+def save_new_price(price):
+    """Saves the new price locally so we can compare it tomorrow."""
+    with open("last_price.txt", "w") as f:
+        f.write(price)
+
+
+def send_to_discord(price):
+    """Structures and sends a beautifully formatted message to Discord."""
     payload = {
         "embeds": [
             {
-                "title": "💰 WARDOGS Gold Market Update",
-                "description": f"The current exchange rate for **1 Gold Bar** has been updated.",
-                "color": 16761035,  # Gold Color Hex
+                "title": "⚖️ WARDOGS Gold Price Shifted!",
+                "description": "The daily market reset just went through with a price change.",
+                "color": 16761035,  # Gold hex code
                 "fields": [
                     {
-                        "name": "Current Price",
-                        "value": f"**{price}** In-Game Cash",
+                        "name": "New Exchange Rate",
+                        "value": f"**{price}** In-Game Cash per Bar",
                         "inline": False,
                     }
                 ],
                 "footer": {
-                    "text": "Automated Daily Update • Click title to visit market",
+                    "text": "Market Shift Alert • Price tracked automatically",
                     "icon_url": "https://wardogshub.gg",
                 },
                 "url": "https://wardogshub.gg",
             }
         ]
     }
+    requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
-    # Send it to your Discord Channel
-    response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code == 204:
-        print("Success: Price posted to Discord!")
+
+def main():
+    live_price = fetch_wardogs_gold_price()
+
+    if not live_price:
+        print("Could not fetch the live price right now. Aborting.")
+        return
+
+    last_price = get_last_saved_price()
+
+    print(f"Live Price: {live_price} | Last Recorded Price: {last_price}")
+
+    if live_price == last_price:
+        print("Price hasn't changed since the last check. No Discord message sent.")
     else:
-        print(f"Failed to send to Discord: {response.status_code}")
+        print("Price change detected! Alerting Discord...")
+        send_to_discord(live_price)
+        save_new_price(live_price)
 
 
 if __name__ == "__main__":
-    send_to_discord()
+    main()
