@@ -9,8 +9,6 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Allows the bot to update last_price.txt
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -21,19 +19,9 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: pip install requests
+        run: pip install requests beautifulsoup4
 
       - name: Run Script
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python bot.py
-          
-      - name: Commit and Push Price Changes
-        run: |
-          git config --global user.name "WardogsPriceBot"
-          git config --global user.email "bot@github.com"
-          git add last_price.txt || true
-          git commit -m "Update last tracked price record" || true
-          git push || true
+        run: python bot.py
