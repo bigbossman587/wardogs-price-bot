@@ -80,7 +80,7 @@ def send_to_discord(price):
     }
     
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code in:
+    if response.status_code in [200, 204]:
         print("Success: Message pushed to Discord channel!")
     else:
         print(f"Discord Webhook error code: {response.status_code}")
