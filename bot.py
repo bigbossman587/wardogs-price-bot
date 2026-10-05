@@ -29,7 +29,7 @@ def fetch_wardogs_gold_price():
         matches = re.findall(r"\b\d{1,3},\d{3}\b", response.text)
         
         if matches:
-            # Format cleanly with a dollar sign
+            # Grab the very first matching number cleanly
             return f"${matches[0]}"
 
         return None
@@ -65,11 +65,9 @@ def send_to_discord(price):
         ]
     }
     
-    response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code in:
-        print("Success: Message pushed to Discord channel!")
-    else:
-        print(f"Discord Webhook error code: {response.status_code}")
+    # Send the update to Discord directly
+    requests.post(DISCORD_WEBHOOK_URL, json=payload)
+    print("Pushed message payload to Discord.")
 
 
 def main():
