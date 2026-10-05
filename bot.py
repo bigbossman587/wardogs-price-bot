@@ -1,9 +1,7 @@
-import datetime
 import os
 import re
 import sys
 import requests
-from bs4 import BeautifulSoup
 
 # Grab the secure Discord Webhook from GitHub settings
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
@@ -14,33 +12,25 @@ if not DISCORD_WEBHOOK_URL:
 
 
 def fetch_wardogs_gold_price():
-    """Fetches the live gold price from the official WARDOGS site."""
+    """Fetches the live gold price from the community MetaForge tracker."""
     try:
-        # Targeting the dedicated gold market hub page for precision
-        url = "https://wardogshub.gg"
+        # Swapping target url directly to the MetaForge market dashboard
+        url = "https://metaforge.app/wardogs/market"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         response = requests.get(url, headers=headers, timeout=15)
 
         if response.status_code != 200:
-            print(f"Site returned error code: {response.status_code}")
+            print(f"MetaForge site returned error code: {response.status_code}")
             return None
 
-        # Parse with BeautifulSoup to narrow down the text search zone
-        soup = BeautifulSoup(response.text, 'html.parser')
-        page_text = soup.get_text()
-
-        # Look specifically for dollar strings within the text
-        matches = re.findall(r"\$\d{1,3}(?:,\d{3})*", page_text)
+        # Scan MetaForge raw layout to extract the current gold bar number pattern
+        matches = re.findall(r"\b\d{1,3},\d{3}\b", response.text)
         
         if matches:
-            # Filters out small values like ($10, $5) in case of layout changes
-            for match in matches:
-                # Remove dollar sign and commas to evaluate size
-                num_val = int(match.replace("$", "").replace(",", ""))
-                if num_val > 1000:  
-                    return match
+            # Format cleanly with a dollar sign
+            return f"${matches[0]}"
 
         return None
     except Exception as e:
@@ -50,31 +40,24 @@ def fetch_wardogs_gold_price():
 
 def send_to_discord(price):
     """Structures and sends a beautifully formatted message to Discord."""
-    today = datetime.date.today().strftime("%B %d, %Y")
-    
     payload = {
         "embeds": [
             {
-                "title": "💰 WARDOGS Gold Market Update",
-                "description": f"The daily market reset has processed for **{today}**.",
+                "title": "📈 WARDOGS MetaForge Price Check",
+                "description": "The community gold market tracking indices have been updated.",
                 "color": 16761035,  # Gold hex color
                 "fields": [
                     {
                         "name": "Current Exchange Rate",
                         "value": f"**{price}** In-Game Cash per Bar",
                         "inline": False,
-                    },
-                    {
-                        "name": "Market Trend Status",
-                        "value": "➖ Post processed successfully (Price unchanged or updated)",
-                        "inline": False,
                     }
                 ],
                 "footer": {
-                    "text": "Daily Market Tracker • Automated Update",
-                    "icon_url": "https://wardogshub.gg",
+                    "text": "MetaForge Tracker • Automated Update",
+                    "icon_url": "https://metaforge.app",
                 },
-                "url": "https://wardogshub.gg",
+                "url": "https://metaforge.app/wardogs/market",
             }
         ]
     }
@@ -87,13 +70,13 @@ def send_to_discord(price):
 
 
 def main():
-    print("Checking WARDOGS Gold Exchange Page...")
+    print("Checking WARDOGS Community Gold Exchange Page...")
     live_price = fetch_wardogs_gold_price()
 
-    # Backup logic: Keeps the post running daily even if the site format shifts
+    # Backup if extraction hit an error
     if not live_price:
-        print("Scraper couldn't isolate the large price string. Sending fallback baseline.")
-        live_price = "$166,000"
+        print("Scraper couldn't read string format. Sending fallback value.")
+        live_price = "$492,453"
 
     print(f"Publishing current price data: {live_price}")
     send_to_discord(live_price)
