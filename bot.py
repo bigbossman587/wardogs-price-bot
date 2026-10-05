@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import datetime
 import requests
 
 # Grab the secure Discord Webhook from GitHub settings
@@ -14,8 +15,7 @@ if not DISCORD_WEBHOOK_URL:
 def fetch_wardogs_gold_price():
     """Fetches the live gold price from the community MetaForge tracker."""
     try:
-        # Swapping target url directly to the MetaForge market dashboard
-        url = "https://metaforge.app/wardogs/market"
+        url = "https://metaforge.app"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
@@ -39,12 +39,15 @@ def fetch_wardogs_gold_price():
 
 
 def send_to_discord(price):
-    """Structures and sends a beautifully formatted message to Discord."""
+    """Structures and sends a beautifully formatted message to Discord with the current date."""
+    # Get today's date formatted beautifully (e.g., "October 04, 2026")
+    today_date = datetime.date.today().strftime("%B %d, %Y")
+
     payload = {
         "embeds": [
             {
-                "title": "📈 WARDOGS MetaForge Price Check",
-                "description": "The community gold market tracking indices have been updated.",
+                "title": f"📈 WARDOGS Gold Market Update",
+                "description": f"Market report for **{today_date}**.",
                 "color": 16761035,  # Gold hex color
                 "fields": [
                     {
@@ -57,13 +60,13 @@ def send_to_discord(price):
                     "text": "MetaForge Tracker • Automated Update",
                     "icon_url": "https://metaforge.app",
                 },
-                "url": "https://metaforge.app/wardogs/market",
+                "url": "https://metaforge.app",
             }
         ]
     }
     
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code in [200, 204]:
+    if response.status_code in:
         print("Success: Message pushed to Discord channel!")
     else:
         print(f"Discord Webhook error code: {response.status_code}")
