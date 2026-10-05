@@ -46,7 +46,7 @@ def send_to_discord(price):
     payload = {
         "embeds": [
             {
-                "title": f"📈 WARDOGS Gold Market Update",
+                "title": "📈 WARDOGS Gold Market Update",
                 "description": f"Market report for **{today_date}**.",
                 "color": 16761035,  # Gold hex color
                 "fields": [
