@@ -58,9 +58,9 @@ def send_to_discord(price):
                 ],
                 "footer": {
                     "text": "MetaForge Tracker • Automated Update",
-                    "icon_url": "https://metaforge.app",
+                    "icon_url": "https://metaforge.app/wardogs/market",
                 },
-                "url": "https://metaforge.app",
+                "url": "https://metaforge.app/wardogs/market",
             }
         ]
     }
