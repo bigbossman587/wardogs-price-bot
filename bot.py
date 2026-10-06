@@ -15,7 +15,7 @@ if not DISCORD_WEBHOOK_URL:
 def fetch_wardogs_gold_price():
     """Fetches the live gold price from the community MetaForge tracker."""
     try:
-        url = "https://metaforge.app"
+        url = "https://metaforge.app/wardogs/market"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
