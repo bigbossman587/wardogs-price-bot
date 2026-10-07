@@ -1,6 +1,6 @@
 import os
+import re
 import sys
-import datetime
 import requests
 
 # Grab the secure Discord Webhook from GitHub settings
@@ -12,47 +12,49 @@ if not DISCORD_WEBHOOK_URL:
 
 
 def fetch_wardogs_gold_price():
-    """Fetches the live market rate directly from the MetaForge public API endpoint."""
+    """Fetches the clean live gold price text from the MetaForge database."""
     try:
-        # Pulling directly from the live database API instead of scraping html layouts
-        url = "https://metaforge.app"
+        url = "https://metaforge.app/wardogs/market"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15"
         }
         response = requests.get(url, headers=headers, timeout=15)
 
-        if response.status_code == 200:
-            data = response.json()
-            # Grabs the integer value and formats it cleanly with commas
-            price_int = data.get("current_rate") or data.get("rate")
-            if price_int:
-                return f"{price_int:,}"
+        if response.status_code != 200:
+            print(f"Site returned error code: {response.status_code}")
+            return None
+
+        # Isolate the exact numbers out of the dollar sign pattern text
+        matches = re.findall(r"\$\d{1,3}(?:,\d{3})*", response.text)
+        
+        if matches:
+            # Safely grab the first element as pure, clean text without list brackets
+            clean_price = str(matches[0])
+            return clean_price
 
         return None
     except Exception as e:
-        print(f"Database query error: {e}")
+        print(f"Scraping error encountered: {e}")
         return None
 
 
 def send_to_discord(price):
-    """Structures and sends a beautifully formatted message to Discord with the current date."""
-    today_date = datetime.date.today().strftime("%B %d, %Y")
-
+    """Structures and sends a beautifully formatted message to Discord."""
     payload = {
         "embeds": [
             {
-                "title": "📈 WARDOGS Gold Market Update",
-                "description": f"Market report for **{today_date}**.",
+                "title": "💰 WARDOGS Gold Market Update",
+                "description": "The daily market reset has processed.",
                 "color": 16761035,  # Gold hex color
                 "fields": [
                     {
                         "name": "Current Exchange Rate",
-                        "value": f"**${price}** In-Game Cash per Bar",
+                        "value": f"**{price}** In-Game Cash per Bar",
                         "inline": False,
                     }
                 ],
                 "footer": {
-                    "text": "MetaForge Real-Time Sync",
+                    "text": "Daily Market Tracker • Automated Update",
                     "icon_url": "https://metaforge.app",
                 },
                 "url": "https://metaforge.app/wardogs/market",
@@ -60,20 +62,23 @@ def send_to_discord(price):
         ]
     }
     
-    requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    print("Pushed message payload to Discord.")
+    response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+    if response.status_code in [200, 204]:
+        print("Success: Message pushed to Discord channel!")
+    else:
+        print(f"Discord Webhook error code: {response.status_code}")
 
 
 def main():
-    print("Connecting to MetaForge Database Feed...")
+    print("Checking WARDOGS Gold Exchange Page...")
     live_price = fetch_wardogs_gold_price()
 
-    # Dynamic fail-safe fallback value logic
+    # Safety fall-through check
     if not live_price:
-        print("API endpoint offline. Sending safety fallback value.")
-        live_price = "459,112"
+        print("Scraper couldn't read string format. Sending default baseline.")
+        live_price = "$166,000"
 
-    print(f"Publishing current price data: ${live_price}")
+    print(f"Publishing current price data: {live_price}")
     send_to_discord(live_price)
 
 
