@@ -28,7 +28,7 @@ def fetch_wardogs_gold_price():
         # Parse the JSON payload directly
         data = response.json()
         
-        # Extract the current rate from the API keys (Adjust key names if needed based on API schema)
+        # Extract the current rate from the API keys
         rate = data.get("current_rate") or data.get("rate")
         
         if rate:
@@ -61,13 +61,15 @@ def send_to_discord(price):
                 "footer": {
                     "text": "Daily Market Tracker • Automated Update",
                 },
-                "url": "https://metaforge.app/wardogs/market",
+                "url": "https://metaforge.app",
             }
         ]
     }
     
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code in:
+    
+    # Fixed conditional statement to avoid syntax errors
+    if response.status_code == 200 or response.status_code == 204:
         print("Success: Message pushed to Discord channel!")
     else:
         print(f"Discord Webhook error code: {response.status_code}")
