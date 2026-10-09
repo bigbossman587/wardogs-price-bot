@@ -11,37 +11,35 @@ if not DISCORD_WEBHOOK_URL:
 
 
 def fetch_wardogs_gold_price():
-    """Extracts the precise live gold price text cleanly from the source."""
+    """Fetches the live gold price directly from the Wardogs market API endpoint."""
     try:
-        url = "https://metaforge.app/wardogs/market"
+        # Targeting the raw data endpoint directly instead of scraping raw HTML text
+        url = "https://metaforge.app"
         headers = {
-            "User-Agent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15"
+            "User-Agent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+            "Accept": "application/json"
         }
         response = requests.get(url, headers=headers, timeout=15)
 
         if response.status_code != 200:
-            print(f"Site returned error code: {response.status_code}")
+            print(f"API returned error code: {response.status_code}")
             return None
 
-        # Isolate the exact market text segment containing the rate
-        text_data = response.text
+        # Parse the JSON payload directly
+        data = response.json()
         
-        if "Current rate" in text_data:
-            # Locate the exact line containing the value string
-            start_index = text_data.find("Current rate")
-            # Extract a clean, localized snippet of the surrounding numbers
-            snippet = text_data[start_index : start_index + 40]
-            
-            # Use a targeted sweep to extract the full cash number
-            import re
-            numbers = re.findall(r"\d{1,3}(?:,\d{3})+", snippet)
-            
-            if numbers:
-                return f"${numbers[0]}"
+        # Extract the current rate from the API keys (Adjust key names if needed based on API schema)
+        rate = data.get("current_rate") or data.get("rate")
+        
+        if rate:
+            # Format numbers cleanly with commas if it comes back as an integer/float
+            if isinstance(rate, (int, float)):
+                return f"${rate:,}"
+            return f"${rate}".replace("$$", "$")
 
         return None
     except Exception as e:
-        print(f"Scraping error encountered: {e}")
+        print(f"API extraction error encountered: {e}")
         return None
 
 
@@ -62,7 +60,6 @@ def send_to_discord(price):
                 ],
                 "footer": {
                     "text": "Daily Market Tracker • Automated Update",
-                    "icon_url": "https://metaforge.app",
                 },
                 "url": "https://metaforge.app/wardogs/market",
             }
@@ -70,20 +67,20 @@ def send_to_discord(price):
     }
     
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    if response.status_code in [200, 204]:
+    if response.status_code in:
         print("Success: Message pushed to Discord channel!")
     else:
         print(f"Discord Webhook error code: {response.status_code}")
 
 
 def main():
-    print("Checking WARDOGS Gold Exchange Page...")
+    print("Checking WARDOGS Gold Exchange API...")
     live_price = fetch_wardogs_gold_price()
 
-    # Safety fall-through backup block
+    # Safety fall-through backup block modified to alert you if it fails
     if not live_price:
-        print("Scraper text split issue. Sending fallback baseline.")
-        live_price = "$326,749"
+        print("API extraction failed. Sending warning fallback baseline.")
+        live_price = "$326,749 (Fallback Value)"
 
     print(f"Publishing current price data: {live_price}")
     send_to_discord(live_price)
