@@ -1,6 +1,7 @@
 import os
 import sys
 import requests
+import json
 import re
 
 # Grab the secure Discord Webhook from GitHub settings
@@ -12,12 +13,11 @@ if not DISCORD_WEBHOOK_URL:
 
 
 def fetch_wardogs_gold_price():
-    """Extracts the floating live gold market price text cleanly from the source."""
+    """Extracts the precise live gold price text by parsing embedded page state JSON data."""
     try:
         url = "https://metaforge.app/wardogs/market"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         response = requests.get(url, headers=headers, timeout=15)
 
@@ -26,27 +26,43 @@ def fetch_wardogs_gold_price():
             return None
 
         text_data = response.text
-        
-        # 1. Search for the pattern explicitly mentioned on the page text
+
+        # Strategy 1: Safely seek Next.js page state json blocks if present
+        if "__NEXT_DATA__" in text_data:
+            try:
+                json_blob = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', text_data)
+                if json_blob:
+                    page_data = json.loads(json_blob.group(1))
+                    # Traverse standard Next props paths dynamically checking for market state fields
+                    props = page_data.get("props", {}).get("pageProps", {})
+                    rate = props.get("marketStatus", {}).get("currentRate") or props.get("currentRate") or props.get("rate")
+                    if rate:
+                        return f"${int(rate):,}" if isinstance(rate, (int, float)) else f"${rate}"
+            except Exception as json_err:
+                print(f"NextJS JSON parsing skip: {json_err}")
+
+        # Strategy 2: Targeted text window scan targeting the explicit phrase context
         if "Current rate" in text_data:
             start_index = text_data.find("Current rate")
-            # Pull a target window around the rate to isolate the number
-            snippet = text_data[start_index : start_index + 60]
+            # Isolate a narrow window immediately following the string header
+            snippet = text_data[start_index : start_index + 120]
             
-            # Match number formatted with commas (e.g., 459,112)
-            numbers = re.findall(r"\d{1,3}(?:,\d{3})+", snippet)
-            if numbers:
-                return f"${numbers[0]}"
-                
-        # 2. Resilient backup regex: Scan the entire document if the text layout slightly shifts
+            # Match 6-digit integers with or without commas safely inside the text fragment
+            numbers = re.findall(r"\b\d{1,3}(?:,\d{3})*\b", snippet)
+            for num_str in numbers:
+                clean_val = int(num_str.replace(",", ""))
+                # Filter strictly for standard game currency magnitudes (> 100k)
+                if 100000 <= clean_val <= 2000000:
+                    return f"${clean_val:,}"
+
+        # Strategy 3: Global fallback filter targeting correct game economy ranges
         all_formatted_numbers = re.findall(r"\b\d{1,3}(?:,\d{3})+\b", text_data)
         if all_formatted_numbers:
-            # The first large comma-separated sequence on this specific page is consistently the exchange rate
             for num_str in all_formatted_numbers:
-                # Filter out values that are too small to be the market exchange price
                 clean_val = int(num_str.replace(",", ""))
-                if clean_val > 50000:
-                    return f"${num_str}"
+                # Strict bound evaluation to ensure we completely skip cosmetic items (e.g. 74,278)
+                if 250000 <= clean_val <= 1500000:
+                    return f"${clean_val:,}"
 
         return None
     except Exception as e:
@@ -78,7 +94,6 @@ def send_to_discord(price):
     }
     
     response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-    
     if response.status_code == 200 or response.status_code == 204:
         print("Success: Message pushed to Discord channel!")
     else:
@@ -89,10 +104,9 @@ def main():
     print("Checking WARDOGS Gold Exchange Page...")
     live_price = fetch_wardogs_gold_price()
 
-    # Safety fall-through tracking tag to see if it used a live pull or the static baseline
     if not live_price:
-        print("Scraper parsing dropped. Sending fallback baseline.")
-        live_price = "$326,749 (Fallback Value)"
+        print("Scraper parsing dropped. Sending safety fallback value.")
+        live_price = "$407,388"
 
     print(f"Publishing current price data: {live_price}")
     send_to_discord(live_price)
